@@ -125,6 +125,9 @@
         <div><span>Aktualna przerwa:</span> <span id="currentBreak" class="stat-val">0 dni</span></div>
     </div>
     <button id="workoutBtn" onclick="completeWorkout()">ZROBIONE!</button>
+    
+    <button onclick="requestNotificationPermission()" style="background-color: #4a5568; margin-top: 15px; font-size: 14px; padding: 10px;">🔔 Włącz Przypomnienia o 8:00</button>
+    
     <div class="action-links">
         <button class="small-btn" onclick="logout()">Wyloguj się</button>
         <button class="small-btn test-btn" onclick="simulateNextDay()">Przewiń dzień (Test) ➡️</button>
@@ -149,14 +152,16 @@
     }
 
     function requestNotificationPermission() {
-        if ("Notification" in window && typeof Notification.requestPermission === 'function') {
-            try {
-                Notification.requestPermission().then(permission => {
-                    console.log("Status powiadomień:", permission);
-                }).catch(err => console.log("Ignoruję błąd powiadomień:", err));
-            } catch(e) {
-                console.log("Starsza przeglądarka, błąd powiadomień przechwycony.");
-            }
+        if ("Notification" in window) {
+            Notification.requestPermission().then(permission => {
+                if (permission === "granted") {
+                    alert("Super! Od teraz będziesz dostawać powiadomienia o 8:00.");
+                } else {
+                    alert("Dostęp zablokowany. Zmień uprawnienia w ustawieniach kłódki przy adresie strony.");
+                }
+            });
+        } else {
+            alert("Twoja przeglądarkka nie obsługuje powiadomień mobilnych.");
         }
     }
 
@@ -164,23 +169,22 @@
         const user = document.getElementById('username').value.trim();
         if(!user) return alert('Wpisz nazwę użytkownika!');
         localStorage.setItem('currentUser', user);
-        
-        // Wywołujemy prośbę bez blokowania dalszego kodu
-        requestNotificationPermission();
-        
-        // Natychmiast przechodzimy do aplikacji
         initApp(user);
     }
 
     function logout() {
         localStorage.removeItem('currentUser');
-        document.getElementById('authScreen').className = 'container';
-        document.getElementById('appScreen').className = 'container hidden';
+        document.getElementById('authScreen').style.display = 'block';
+        document.getElementById('appScreen').style.display = 'none';
+        document.getElementById('authScreen').classList.remove('hidden');
+        document.getElementById('appScreen').classList.add('hidden');
     }
 
-    function initApp(user, isTestMode = false) {
-        document.getElementById('authScreen').className = 'container hidden';
-        document.getElementById('appScreen').className = 'container';
+    function initApp(user) {
+        document.getElementById('authScreen').style.display = 'none';
+        document.getElementById('appScreen').style.display = 'block';
+        document.getElementById('authScreen').classList.add('hidden');
+        document.getElementById('appScreen').classList.remove('hidden');
         document.getElementById('welcomeText').innerText = `Cześć ${user}!`;
 
         let userData = JSON.parse(localStorage.getItem(`streak_data_${user}`)) || {
@@ -255,21 +259,20 @@
         if (userData.lastWorkoutDate === null) {
             userData.streak = 1;
         } else {
-            if (daysDiff === 1) {
-                userData.streak += 1;
-            } else if (daysDiff > 1 || userData.streak === 0) {
-                userData.streak = 1;
-            }
-        }
-
-        if (userData.streak > userData.maxStreak) {
-            userData.maxStreak = userData.streak;
-        }
+if (daysDiff === 1) {
+userData.streak += 1;
+} else if (daysDiff > 1 || userData.streak === 0) {
+userData.streak = 1;
+}
+}
+if (userData.streak > userData.maxStreak) {
+userData.maxStreak = userData.streak;
+}
 userData.totalWorkouts = (userData.totalWorkouts || 0) + 1;
 userData.currentBreak = 0;
 userData.lastWorkoutDate = todayStr;
 localStorage.setItem(streak_data_${user}, JSON.stringify(userData));
-initApp(user, true);
+initApp(user);
 }
 function simulateNextDay() {
 const user = localStorage.getItem('currentUser');
@@ -283,7 +286,7 @@ const lastDate = parseDateString(userData.lastWorkoutDate);
 lastDate.setDate(lastDate.getDate() - 1);
 userData.lastWorkoutDate = formatDateToString(lastDate);
 localStorage.setItem(streak_data_${user}, JSON.stringify(userData));
-initApp(user, true);
+initApp(user);
 }
 function startMorningReminderCheck() {
 setInterval(() => {
@@ -310,4 +313,3 @@ const savedUser = localStorage.getItem('currentUser');
 if(savedUser) initApp(savedUser);
 startMorningReminderCheck();
 }
-
