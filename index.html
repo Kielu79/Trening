@@ -149,12 +149,14 @@
     }
 
     function requestNotificationPermission() {
-        if ("Notification" in window) {
-            Notification.requestPermission().then(permission => {
-                if (permission === "granted") {
-                    console.log("Powiadomienia włączone.");
-                }
-            });
+        if ("Notification" in window && typeof Notification.requestPermission === 'function') {
+            try {
+                Notification.requestPermission().then(permission => {
+                    console.log("Status powiadomień:", permission);
+                }).catch(err => console.log("Ignoruję błąd powiadomień:", err));
+            } catch(e) {
+                console.log("Starsza przeglądarka, błąd powiadomień przechwycony.");
+            }
         }
     }
 
@@ -162,19 +164,23 @@
         const user = document.getElementById('username').value.trim();
         if(!user) return alert('Wpisz nazwę użytkownika!');
         localStorage.setItem('currentUser', user);
+        
+        // Wywołujemy prośbę bez blokowania dalszego kodu
         requestNotificationPermission();
+        
+        // Natychmiast przechodzimy do aplikacji
         initApp(user);
     }
 
     function logout() {
         localStorage.removeItem('currentUser');
-        document.getElementById('authScreen').classList.remove('hidden');
-        document.getElementById('appScreen').classList.add('hidden');
+        document.getElementById('authScreen').className = 'container';
+        document.getElementById('appScreen').className = 'container hidden';
     }
 
     function initApp(user, isTestMode = false) {
-        document.getElementById('authScreen').classList.add('hidden');
-        document.getElementById('appScreen').classList.remove('hidden');
+        document.getElementById('authScreen').className = 'container hidden';
+        document.getElementById('appScreen').className = 'container';
         document.getElementById('welcomeText').innerText = `Cześć ${user}!`;
 
         let userData = JSON.parse(localStorage.getItem(`streak_data_${user}`)) || {
@@ -259,17 +265,14 @@
         if (userData.streak > userData.maxStreak) {
             userData.maxStreak = userData.streak;
         }
-
-        userData.totalWorkouts = (userData.totalWorkouts || 0) + 1;
-        userData.currentBreak = 0;
-        userData.lastWorkoutDate = todayStr;
-        localStorage.setItem(`streak_data_${user}`, JSON.stringify(userData));
-
-        initApp(user, true);
-    }
-
-    function simulateNextDay() {
-        const user = localStorage.getItem('currentUser');
+userData.totalWorkouts = (userData.totalWorkouts || 0) + 1;
+userData.currentBreak = 0;
+userData.lastWorkoutDate = todayStr;
+localStorage.setItem(streak_data_${user}, JSON.stringify(userData));
+initApp(user, true);
+}
+function simulateNextDay() {
+const user = localStorage.getItem('currentUser');
 if (!user) return;
 let userData = JSON.parse(localStorage.getItem(streak_data_${user}));
 if (!userData || !userData.lastWorkoutDate) {
@@ -291,7 +294,7 @@ if (user) {
 let userData = JSON.parse(localStorage.getItem(streak_data_${user}));
 const todayStr = ${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')};
 if (!userData || userData.lastWorkoutDate !== todayStr) {
-if (Notification.permission === "granted") {
+if (window.Notification && Notification.permission === "granted") {
 new Notification("⏰ Czas na trening!", {
 body: Hej ${user}! Nie zapomnij o dzisiejszym treningu, aby utrzymać serię! 💪,
 icon: "flaticon.com"
