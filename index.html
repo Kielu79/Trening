@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#f0f4f8">
+    <link rel="icon" type="image/png" href="https://flaticon.com">
+    <link rel="apple-touch-icon" href="https://flaticon.com">
+    <title>Mój Trening</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            background-color: #f0f4f8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            user-select: none;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+            width: 340px;
+            text-align: center;
+        }
+        .hidden { display: none !important; }
+        h2 { margin-bottom: 5px; color: #1a202c; font-size: 24px; }
+        input {
+            width: 90%;
+            padding: 14px;
+            margin: 10px 0;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 16px;
+            outline: none;
+        }
+        button {
+            width: 100%;
+            padding: 16px;
+            background-color: #38a169;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(56, 161, 105, 0.2);
+        }
+        button:hover { background-color: #2f855a; transform: translateY(-1px); }
+        button:disabled {
+            background-color: #cbd5e0;
+            color: #718096;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+        .streak-badge { font-size: 64px; margin: 15px 0 5px 0; }
+        .main-stat { font-size: 18px; color: #4a5568; margin-bottom: 15px; }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+            background: #f7fafc;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            text-align: left;
+            font-size: 14px;
+            color: #4a5568;
+        }
+        .stats-grid div {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px dashed #e2e8f0;
+            padding-bottom: 4px;
+        }
+        .stats-grid div:last-child { border-bottom: none; padding-bottom: 0; }
+        .stat-val { font-weight: bold; color: #2d3748; }
+        .break-active { color: #e53e3e; font-weight: bold; }
+        .action-links {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+        }
+        .small-btn {
+            background: none;
+            color: #e53e3e;
+            font-size: 13px;
+            padding: 5px;
+            font-weight: normal;
+            text-decoration: underline;
+            box-shadow: none;
+            width: auto;
+            cursor: pointer;
+            border: none;
+        }
+        .test-btn { color: #4a5568; }
+        .app-logo { width: 70px; height: 70px; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+<div id="authScreen" class="container">
+    <img src="https://flaticon.com" class="app-logo" alt="Logo">
+    <h2>Mój Trening</h2>
+    <p style="color: #718096; font-size: 14px; margin-top: 0;">Wpisz imię, aby śledzić nawyk</p>
+    <input type="text" id="username" placeholder="Twoje imię...">
+    <button onclick="login()" style="background-color: #3182ce; box-shadow: 0 4px 12px rgba(49, 130, 206, 0.2); margin-top: 10px;">Wejdź</button>
+</div>
+
+<div id="appScreen" class="container hidden">
+    <h2 id="welcomeText">Cześć!</h2>
+    <div class="streak-badge" id="streakEmoji">💀</div>
+    <div class="main-stat">Aktualna seria: <strong id="streakCount">0</strong> dni</div>
+    <div class="stats-grid">
+        <div><span>Najlepsza seria:</span> <span class="stat-val" id="maxStreakCount">0 dni</span></div>
+        <div><span>Wszystkie treningi razem:</span> <span class="stat-val" id="totalWorkouts">0 dni</span></div>
+        <div><span>Aktualna przerwa:</span> <span id="currentBreak" class="stat-val">0 dni</span></div>
+    </div>
+    <button id="workoutBtn" onclick="completeWorkout()">ZROBIONE!</button>
+    <div class="action-links">
+        <button class="small-btn" onclick="logout()">Wyloguj się</button>
+        <button class="small-btn test-btn" onclick="simulateNextDay()">Przewiń dzień (Test) ➡️</button>
+    </div>
+</div>
+
+<script>
+    function getTodayDate() {
+        const d = new Date();
+        d.setHours(0,0,0,0);
+        return d;
+    }
+
+    function parseDateString(str) {
+        if (!str) return null;
+        const [y, m, d] = str.split('-').map(Number);
+        return new Date(y, m - 1, d, 0, 0, 0, 0);
+    }
+
+    function formatDateToString(date) {
+        return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+    }
+
+    function requestNotificationPermission() {
+        if ("Notification" in window) {
+            Notification.requestPermission().then(permission => {
+                if (permission === "granted") {
+                    console.log("Powiadomienia włączone.");
+                }
+            });
+        }
+    }
+
+    function login() {
+        const user = document.getElementById('username').value.trim();
+        if(!user) return alert('Wpisz nazwę użytkownika!');
+        localStorage.setItem('currentUser', user);
+        requestNotificationPermission();
+        initApp(user);
+    }
+
+    function logout() {
+        localStorage.removeItem('currentUser');
+        document.getElementById('authScreen').classList.remove('hidden');
+        document.getElementById('appScreen').classList.add('hidden');
+    }
+
+    function initApp(user, isTestMode = false) {
+        document.getElementById('authScreen').classList.add('hidden');
+        document.getElementById('appScreen').classList.remove('hidden');
+        document.getElementById('welcomeText').innerText = `Cześć ${user}!`;
+
+        let userData = JSON.parse(localStorage.getItem(`streak_data_${user}`)) || {
+            streak: 0,
+            maxStreak: 0,
+            totalWorkouts: 0,
+            currentBreak: 0,
+            lastWorkoutDate: null
+        };
+
+        const today = getTodayDate();
+        const todayStr = formatDateToString(today);
+        
+        let daysDiff = 0;
+        if (userData.lastWorkoutDate) {
+            const lastDate = parseDateString(userData.lastWorkoutDate);
+            const timeDiff = today.getTime() - lastDate.getTime();
+            daysDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+        }
+
+        if (userData.lastWorkoutDate === null) {
+            userData.currentBreak = 0;
+        } else if (userData.lastWorkoutDate === todayStr) {
+            userData.currentBreak = 0;
+        } else {
+            userData.currentBreak = daysDiff;
+            if (daysDiff > 1) {
+                userData.streak = 0;
+            }
+        }
+        localStorage.setItem(`streak_data_${user}`, JSON.stringify(userData));
+
+        document.getElementById('streakCount').innerText = userData.streak;
+        document.getElementById('maxStreakCount').innerText = `${userData.maxStreak || 0} dni`;
+        document.getElementById('totalWorkouts').innerText = `${userData.totalWorkouts || 0} dni`;
+        
+        const breakEl = document.getElementById('currentBreak');
+        breakEl.innerText = `${userData.currentBreak} dni`;
+        if (userData.currentBreak > 0) {
+            breakEl.className = "break-active";
+        } else {
+            breakEl.className = "stat-val";
+        }
+        
+        const btn = document.getElementById('workoutBtn');
+        
+        if (userData.lastWorkoutDate === todayStr) {
+            btn.innerText = "TRENING ODZNACZONY!";
+            btn.disabled = true;
+            document.getElementById('streakEmoji').innerText = "✅";
+        } else {
+            btn.innerText = "ZROBIONE!";
+            btn.disabled = false;
+            document.getElementById('streakEmoji').innerText = userData.streak > 0 ? "🔥" : "💀";
+        }
+    }
+
+    function completeWorkout() {
+        const user = localStorage.getItem('currentUser');
+        let userData = JSON.parse(localStorage.getItem(`streak_data_${user}`));
+        
+        const today = getTodayDate();
+        const todayStr = formatDateToString(today);
+
+        let daysDiff = 0;
+        if (userData.lastWorkoutDate) {
+            const lastDate = parseDateString(userData.lastWorkoutDate);
+            const timeDiff = today.getTime() - lastDate.getTime();
+            daysDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+        }
+
+        if (userData.lastWorkoutDate === null) {
+            userData.streak = 1;
+        } else {
+            if (daysDiff === 1) {
+                userData.streak += 1;
+            } else if (daysDiff > 1 || userData.streak === 0) {
+                userData.streak = 1;
+            }
+        }
+
+        if (userData.streak > userData.maxStreak) {
+            userData.maxStreak = userData.streak;
+        }
+
+        userData.totalWorkouts = (userData.totalWorkouts || 0) + 1;
+        userData.currentBreak = 0;
+        userData.lastWorkoutDate = todayStr;
+        localStorage.setItem(`streak_data_${user}`, JSON.stringify(userData));
+
+        initApp(user, true);
+    }
+
+    function simulateNextDay() {
+        const user = localStorage.getItem('currentUser');
+if (!user) return;
+let userData = JSON.parse(localStorage.getItem(streak_data_${user}));
+if (!userData || !userData.lastWorkoutDate) {
+alert("Najpierw kliknij 'ZROBIONE!' chociaż raz!");
+return;
+}
+const lastDate = parseDateString(userData.lastWorkoutDate);
+lastDate.setDate(lastDate.getDate() - 1);
+userData.lastWorkoutDate = formatDateToString(lastDate);
+localStorage.setItem(streak_data_${user}, JSON.stringify(userData));
+initApp(user, true);
+}
+function startMorningReminderCheck() {
+setInterval(() => {
+const now = new Date();
+if (now.getHours() === 8 && now.getMinutes() === 0 && now.getSeconds() === 0) {
+const user = localStorage.getItem('currentUser');
+if (user) {
+let userData = JSON.parse(localStorage.getItem(streak_data_${user}));
+const todayStr = ${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')};
+if (!userData || userData.lastWorkoutDate !== todayStr) {
+if (Notification.permission === "granted") {
+new Notification("⏰ Czas na trening!", {
+body: Hej ${user}! Nie zapomnij o dzisiejszym treningu, aby utrzymać serię! 💪,
+icon: "flaticon.com"
+});
+}
+}
+}
+}
+}, 1000);
+}
+window.onload = function() {
+const savedUser = localStorage.getItem('currentUser');
+if(savedUser) initApp(savedUser);
+startMorningReminderCheck();
+}
+
